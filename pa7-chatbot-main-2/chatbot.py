@@ -6,6 +6,7 @@
 import util
 
 import numpy as np
+import re
 
 
 # noinspection PyMethodMayBeStatic
@@ -106,9 +107,9 @@ class Chatbot:
         preprocessed = self.preprocess(line)
 #        print(preprocessed)
         title_list = self.extract_titles(preprocessed)
-#        print(title_list)
+        # print(title_list)
         movies = self.find_movies_by_title(title_list)
-#        print(movies)
+        # print(movies)
         opinion = self.extract_sentiment(preprocessed)
 #        print(opinion)
         
@@ -148,29 +149,29 @@ class Chatbot:
         # your implementation to do any generic preprocessing, feel free to    #
         # leave this method unmodified.                                        #
         ########################################################################
-        sentence_list = []
-        word = ''
+        # sentence_list = []
+        # word = ''
         for i in range(len(text)):
             if text[i-1] == '"':
                 text[i].upper()
             if text[i-1] != '"':
                 text[i].lower()
 #            print(text)
-            if text[i] == ' ':
-                sentence_list.append(word)
-                word = ''
-            if text[i] != ' ':
-#                print(text[i])
-                word += text[i]
-        if text[-1] != ' ':
-#            print("made it")
-            sentence_list.append(word)
+#             if text[i] == ' ':
+#                 sentence_list.append(word)
+#                 word = ''
+#             if text[i] != ' ':
+# #                print(text[i])
+#                 word += text[i]
+#         if text[-1] != ' ':
+# #            print("made it")
+#             sentence_list.append(word)
 #            print(sentence_list)
         ########################################################################
         #                             END OF YOUR CODE                         #
         ########################################################################
 
-        return sentence_list
+        return text
 
     def extract_titles(self, preprocessed_input):
         """Extract potential movie titles from a line of pre-processed text.
@@ -195,21 +196,25 @@ class Chatbot:
         :returns: list of movie titles that are potentially in the text
         """
         list_of_films = []
-        title = ''
-        tracker = 0
-        for word in preprocessed_input:
-            if tracker == 1:
-                if word[-1] =='"':
-                    tracker -= 0
-                    list_of_films.append(title)
-                    title = ''
-                else:
-                    title = title + " " + elem
-            elif word[0] == '"':
-                tracker += 1
-                if word[-1] == '"':
-                    list_of_films.append(word[1:-1])
-                    tracker -= 1
+        # title = ''
+        # tracker = 0
+        # for word in preprocessed_input:
+        #     if tracker == 1:
+        #         if word[-1] =='"':
+        #             tracker -= 0
+        #             list_of_films.append(title)
+        #             title = ''
+        #         else:
+        #             title = title + " " + elem
+        #     elif word[0] == '"':
+        #         tracker += 1
+        #         if word[-1] == '"':
+        #             list_of_films.append(word[1:-1])
+        #             tracker -= 1
+        # print(preprocessed_input)
+        regex = '"\w+"'
+        list_of_films = re.findall(regex, preprocessed_input)
+        # print(list_of_films)
         return list_of_films
 
     def find_movies_by_title(self, title):
@@ -232,11 +237,12 @@ class Chatbot:
         """
         results = []
         for elem in title:
-#            print(elem)
+            # print(elem)
 #            elem = elem[1:-1]
 #            print(self.titles)
             for i in range(len(self.titles)):
-                if elem in self.titles[i][0]:
+                # print(self.titles[i])
+                if elem[1:-1] in self.titles[i][0]:
                     results.append(i)
         return results
 
@@ -262,13 +268,23 @@ class Chatbot:
         """
         sentiment = 0
 #        print(preprocessed_input)
+
+        # ed = '\w+d'
+        # list_of_past_words = re.findall(ed, preprocessed_input)
+        # list_of_past_words
+
+
         for word in preprocessed_input:
-#            print(word)
+            print(word[:-1])
             if word in self.sentiment:
-            
-                if self.sentiment[word] == "pos":
+                if self.sentiment[word] == 'pos':
                     sentiment += 1
-                if self.sentiment[word] == "neg":
+                if self.sentiment[word] == 'neg':
+                    sentiment -= 1
+            if word[:-1] in self.sentiment:
+                if self.sentiment[word[:-1]] == 'pos':
+                    sentiment += 1
+                if self.sentiment[word[:-1]] == 'neg':
                     sentiment -= 1
 #        print(sentiment)
         if sentiment > 0:
