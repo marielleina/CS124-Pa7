@@ -212,8 +212,10 @@ class Chatbot:
         #             list_of_films.append(word[1:-1])
         #             tracker -= 1
         # print(preprocessed_input)
-        regex = '"\w+"'
+        regex = '"\w+\s*\w*"'
         list_of_films = re.findall(regex, preprocessed_input)
+        # print(list_of_films[0])
+        # list_of_films = ' '.join(list_of_films)
         # print(list_of_films)
         return list_of_films
 
@@ -267,15 +269,19 @@ class Chatbot:
         :returns: a numerical value for the sentiment of the text
         """
         sentiment = 0
+        negation_words = ['no', 'not', 'never', 'none', 'nobody', 'nothing', 'neither', 'nor', 'without', 'cannot', 'won\'t', 'don\'t', 'didn\'t', 'isn\'t', 'aren\'t', 'wasn\'t', 'weren\'t', 'haven\'t', 'hasn\'t', 'hadn\'t', 'shouldn\'t', 'wouldn\'t', 'couldn\'t', 'mightn\'t', 'needn\'t', 'rarely', 'scarcely', 'seldom', 'hardly', 'barely', 'refuse']
+
 #        print(preprocessed_input)
 
         # ed = '\w+d'
         # list_of_past_words = re.findall(ed, preprocessed_input)
         # list_of_past_words
-
+        preprocessed_input = preprocessed_input.split(' ')
 
         for word in preprocessed_input:
-            print(word[:-1])
+            # print(preprocessed_input)
+            # print(word)
+            # print(word[:-1])
             if word in self.sentiment:
                 if self.sentiment[word] == 'pos':
                     sentiment += 1
@@ -287,6 +293,15 @@ class Chatbot:
                 if self.sentiment[word[:-1]] == 'neg':
                     sentiment -= 1
 #        print(sentiment)
+            # print(word)
+        for elem in negation_words:
+            if elem in preprocessed_input:
+                # print(word)
+                # print("made it to negation")
+                # print(sentiment)
+                sentiment = sentiment * -1
+                # print(sentiment)
+        # print(sentiment)
         if sentiment > 0:
             return 1
         elif sentiment < 0:
