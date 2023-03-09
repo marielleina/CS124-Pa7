@@ -33,6 +33,9 @@ class Chatbot:
         # Binarize the movie ratings before storing the binarized matrix.
         self.ratings = ratings
         self.binarize(self.ratings, .5)
+        self.movie_list = []
+        self.opin = 0
+        self.fine_grained = util.load_sentiment_dictionary('data/fine_grained.txt')
         ########################################################################
         #                             END OF YOUR CODE                         #
         ########################################################################
@@ -103,7 +106,8 @@ class Chatbot:
 #            response = "I processed {} in creative mode!!".format(line)
 #        else:
 #            response = "I processed {} in starter mode!!".format(line)
-        
+        response = ''
+        # initial processing
         preprocessed = self.preprocess(line)
 #        print(preprocessed)
         title_list = self.extract_titles(preprocessed)
@@ -112,15 +116,74 @@ class Chatbot:
         # print(movies)
         opinion = self.extract_sentiment(preprocessed)
 #        print(opinion)
-        
-        if opinion == 1:
-            response = "So you like %s, huh?" % self.titles[movies[0]][0]
-        elif opinion == -1:
-            response = "So you didn't like %s, huh?" % self.titles[movies[0]][0]
-        elif len(movies) == 0:
-            response = "Please share with me a movie and your opinion on it."
-        elif opinion == 0:
-            response = "So you have mixed opinions on %s, huh?" % self.titles[movies[0]][0]
+
+        # disambiguate (after given clarification)
+        if len(self.movie_list) >0:
+            print(self.movie_list)
+            # print(preprocessed)
+            narrowed_down = self.disambiguate(preprocessed, self.movie_list)
+            # need to disambiguate again
+            if len(narrowed_down) > 1:
+                self.movie_list = narrowed_down
+                response = "Which movie did you mean? Please give me the year in quotations. "
+                for i in range(len(narrowed_down)):
+                    response += '%s, ' %self.titles[narrowed_down[i]][0]
+            # we have our answer
+            else:
+                movies = narrowed_down
+                opinion = self.opin
+                # print(movies)
+                # self.movie_list = []
+                # self.opin = 0
+
+        #first time there's multiple movies
+        if len(movies) > 1 and len(self.movie_list) == 0:
+            self.movie_list = movies
+            self.opin = opinion
+            
+            response = "Which movie did you mean? Please give me the year in quotations. "
+            for i in range(len(movies)):
+                response += '%s, ' %self.titles[movies[i]][0]
+
+        # print("line 142 :", movies)
+        if len(movies)>0:
+            movie = movies[0]
+        # print(self.titles[movies[0]])
+        emotion_neg_words = ['Upset', 'Sad', 'Angry', 'Tired', 'Frustrated', 'Lonely', 'Nervous', 'Hurt', 'Confused', 'Overwhelmed', 'Insecure', 'Jealous', 'Worried', 'Disappointed', 'Hopeless', 'Miserable', 'Enraged', 'Fearful']
+        emotion_pos_words = ['Happy',  'Excited', 'Hopeful', 'Proud', 'Glad', 'Loved', 'Surprised', 'Calm', 'Relaxed', 'Grateful', 'Appreciated', 'Determined', 'Empowered']
+
+        # doing the opinions to give final confirmation
+        if opinion == 1 and response == '' and len(self.movie_list) != 1 and len(movies) != 0:
+            response = "So you like %s, huh?" % self.titles[movie][0]
+        elif opinion == -1 and response == '' and len(self.movie_list) != 1 and len(movies) != 0:
+            response = "So you didn't like %s, huh?" % self.titles[movie][0]
+        elif len(movies) == 0 and response == '' and len(self.movie_list) != 1:
+            for word in emotion_neg_words:
+                word = word.lower()
+                if word in preprocessed:
+                    response = "Oh! Did I make you %s? I'm sorry!" %word
+            for word in emotion_pos_words:
+                word = word.lower()
+                if word in preprocessed:
+                    response = "Oh! I made you %s? I'm glad!" %word
+            if 'Can you' in preprocessed:
+                response = "I'm sorry, I can't %s. I am a movie-recommendation bot." % preprocessed[preprocessed.rindex('Can you')+7:]
+            elif 'What is' in preprocessed:
+                response = "I'm sorry, I don't know the answer to %s. I am a movie-recommendation bot." % preprocessed
+            elif response == '':
+                response = "Hm, that's not really what I want to talk about now, let's go back to movies."
+        elif opinion == 0 and response == '' and len(self.movie_list) != 1 and len(movies) != 0:
+            response = "So you have mixed opinions on %s, huh?" % self.titles[movie][0]
+        # print('length:', len(self.movie_list))
+        if opinion == 2 and response == '' and len(self.movie_list) != 1 and len(movies) != 0:
+            response = "So you love %s, huh?" % self.titles[movie][0]
+        elif opinion == -2 and response == '' and len(self.movie_list) != 1 and len(movies) != 0:
+            response = "So you hate %s, huh?" % self.titles[movie][0]
+        # zeroing out the record keeping because we have our movie
+        if len(movies) == 1:
+            self.opin = 0
+            self.movie_list = []
+        # print(self.movie_list)
         ########################################################################
         #                          END OF YOUR CODE                            #
         ########################################################################
@@ -240,12 +303,26 @@ class Chatbot:
         results = []
         for elem in title:
             # print(elem)
-#            elem = elem[1:-1]
+            elem = elem[1:-1]
 #            print(self.titles)
             for i in range(len(self.titles)):
                 # print(self.titles[i])
-                if elem[1:-1] in self.titles[i][0]:
+                if elem in self.titles[i][0]:
                     results.append(i)
+                # elif elem.startswith('The'):
+                #     print('made it here')
+                #     ele = elem[3:] + ', The'
+                #     if ele in self.titles[i][0]:
+                #         results.append(i)
+                # elif elem.startswith('A'):
+                #     ele = elem[3:] + ', A'
+                #     if ele in self.titles[i][0]:
+                #         results.append(i)
+                # elif elem.startswith('An'):
+                #     ele = elem[3:] + ', An'
+                #     if ele in self.titles[i][0]:
+                #         results.append(i)
+
         return results
 
     def extract_sentiment(self, preprocessed_input):
@@ -268,46 +345,73 @@ class Chatbot:
         pre-processed with preprocess()
         :returns: a numerical value for the sentiment of the text
         """
-        sentiment = 0
-        negation_words = ['no', 'not', 'never', 'none', 'nobody', 'nothing', 'neither', 'nor', 'without', 'cannot', 'won\'t', 'don\'t', 'didn\'t', 'isn\'t', 'aren\'t', 'wasn\'t', 'weren\'t', 'haven\'t', 'hasn\'t', 'hadn\'t', 'shouldn\'t', 'wouldn\'t', 'couldn\'t', 'mightn\'t', 'needn\'t', 'rarely', 'scarcely', 'seldom', 'hardly', 'barely', 'refuse']
 
-#        print(preprocessed_input)
+        if self.creative == False:
 
-        # ed = '\w+d'
-        # list_of_past_words = re.findall(ed, preprocessed_input)
-        # list_of_past_words
-        preprocessed_input = preprocessed_input.split(' ')
+            sentiment = 0
+            negation_words = ['no', 'not', 'never', 'none', 'nobody', 'nothing', 'neither', 'nor', 'without', 'cannot', 'won\'t', 'don\'t', 'didn\'t', 'isn\'t', 'aren\'t', 'wasn\'t', 'weren\'t', 'haven\'t', 'hasn\'t', 'hadn\'t', 'shouldn\'t', 'wouldn\'t', 'couldn\'t', 'mightn\'t', 'needn\'t', 'rarely', 'scarcely', 'seldom', 'hardly', 'barely', 'refuse']
 
-        for word in preprocessed_input:
-            # print(preprocessed_input)
-            # print(word)
-            # print(word[:-1])
-            if word in self.sentiment:
-                if self.sentiment[word] == 'pos':
-                    sentiment += 1
-                if self.sentiment[word] == 'neg':
-                    sentiment -= 1
-            if word[:-1] in self.sentiment:
-                if self.sentiment[word[:-1]] == 'pos':
-                    sentiment += 1
-                if self.sentiment[word[:-1]] == 'neg':
-                    sentiment -= 1
-#        print(sentiment)
-            # print(word)
-        for elem in negation_words:
-            if elem in preprocessed_input:
-                # print(word)
-                # print("made it to negation")
-                # print(sentiment)
-                sentiment = sentiment * -1
-                # print(sentiment)
-        # print(sentiment)
-        if sentiment > 0:
-            return 1
-        elif sentiment < 0:
-            return -1
-        else:
-            return 0
+            preprocessed_input = preprocessed_input.split(' ')
+
+            for word in preprocessed_input:
+                if word in self.sentiment:
+                    if self.sentiment[word] == 'pos':
+                        sentiment += 1
+                    if self.sentiment[word] == 'neg':
+                        sentiment -= 1
+                if word[:-1] in self.sentiment:
+                    if self.sentiment[word[:-1]] == 'pos':
+                        sentiment += 1
+                    if self.sentiment[word[:-1]] == 'neg':
+                        sentiment -= 1
+            for elem in negation_words:
+                if elem in preprocessed_input:
+                    sentiment = sentiment * -1
+
+            if sentiment > 0:
+                return 1
+            elif sentiment < 0:
+                return -1
+            else:
+                return 0
+
+        
+        elif self.creative == True:
+
+            sentiment = 0
+            negation_words = ['no', 'not', 'never', 'none', 'nobody', 'nothing', 'neither', 'nor', 'without', 'cannot', 'won\'t', 'don\'t', 'didn\'t', 'isn\'t', 'aren\'t', 'wasn\'t', 'weren\'t', 'haven\'t', 'hasn\'t', 'hadn\'t', 'shouldn\'t', 'wouldn\'t', 'couldn\'t', 'mightn\'t', 'needn\'t', 'rarely', 'scarcely', 'seldom', 'hardly', 'barely', 'refuse']
+            intensification = ['really', 'somewhat']
+
+            preprocessed_input = preprocessed_input.split(' ')
+
+            for word in preprocessed_input:
+                if word in self.fine_grained:
+                    sentiment += int(self.fine_grained[word])
+                if word[:-1] in self.fine_grained:
+                    sentiment += int(self.fine_grained[word[:-1]])
+
+            for elem in negation_words:
+                if elem in preprocessed_input:
+                    sentiment = sentiment * -1
+                
+            if 'really' in preprocessed_input:
+                sentiment = sentiment * 2
+                
+            if 'somewhat' in preprocessed_input:
+                sentiment = sentiment / 2
+            # print(sentiment)
+            if sentiment == 0:
+                return 0
+            if sentiment <= 1 and sentiment > 0:
+                return 1
+            if sentiment >= -1 and sentiment < 0:
+                return -1
+            if sentiment > 1:
+                return 2
+            if sentiment < -1:
+                return -2
+                    
+
 
     def extract_sentiment_for_movies(self, preprocessed_input):
         """Creative Feature: Extracts the sentiments from a line of
@@ -381,15 +485,21 @@ class Chatbot:
         :returns: a list of indices corresponding to the movies identified by
         the clarification
         """
+        ls = []
         for i in range(len(candidates)):
-            if candidates[i] == clarification:
-                return [candidates[i]]
-        narrowed_down = []
-        for word in clarification:
-            for i in range(len(candidates)):
-                if word == candidates[i]:
-                    narrowed_down.append(word)
-        return narrowed_down
+            # print(self.titles[candidates[i]][0])
+            # print(clarification[1:-1])
+            if clarification[1:-1] in self.titles[candidates[i]][0]:
+                # print(self.titles[candidates[i]][0])
+                # print('made it here')
+                ls.append(candidates[i])
+        return ls
+        # narrowed_down = []
+        # for word in clarification:
+        #     for i in range(len(candidates)):
+        #         if word == candidates[i]:
+        #             narrowed_down.append(word)
+        # return narrowed_down
     ############################################################################
     # 3. Movie Recommendation helper functions                                 #
     ############################################################################
